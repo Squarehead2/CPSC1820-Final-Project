@@ -35,23 +35,28 @@ from sudoku_logic.sat import solve_sat
 def load_puzzle(spec: str) -> tuple[str, Grid]:
     """A puzzle name from the library, a path to a text file, or 81 symbols."""
     if spec in PUZZLES:
+        # Library entries are (description, grid text). Only the grid is parsed.
         return spec, Grid.parse(PUZZLES[spec][1])
     path = Path(spec)
     if path.is_file():
         return path.name, Grid.parse(path.read_text())
+    # Last resort: treat the argument itself as the 81-character grid.
     return "custom", Grid.parse(spec)
 
 
 def heading(text: str) -> None:
+    """Print a title with a line of '=' under it."""
     print(f"\n{text}\n{'=' * len(text)}")
 
 
 def side_by_side(left: Grid, right: Grid, gap: str = "      ") -> str:
+    """Place two printed grids on one screen, clue grid then solved grid."""
     return "\n".join(a + gap + b for a, b in zip(left.pretty().splitlines(),
                                                    right.pretty().splitlines()))
 
 
 def cmd_list(_args) -> None:
+    """Print every sample puzzle with its clue count and why it is included."""
     heading("Sample puzzles")
     for name, (description, text) in PUZZLES.items():
         clues = sum(ch.isdigit() for ch in text)
@@ -59,6 +64,7 @@ def cmd_list(_args) -> None:
 
 
 def cmd_rules(_args) -> None:
+    """Print the predicate-logic rules, one expanded clause, and the counts."""
     heading("Sudoku rules in predicate logic")
     print("Domain: r, c, n ∈ {1,...,9}.  P(r,c,n) = 'row r, column c holds digit n'.\n")
     for name, formula in PREDICATE_RULES.items():
@@ -73,11 +79,13 @@ def cmd_rules(_args) -> None:
 
     heading("Counting the formula")
     for what, how, count in counting_summary():
+        # 2^729 and 9^81 are too long to print, so show the power of ten instead.
         shown = f"{count:,}" if count < 10**12 else f"≈ 10^{len(str(count)) - 1}"
         print(f"  {what:<38} {how:<30} {shown}")
 
 
 def cmd_encode(args) -> None:
+    """Show how many clauses each rule produces, and optionally save DIMACS."""
     name, grid = load_puzzle(args.puzzle)
     cnf = encode(grid)
     heading(f"CNF encoding of '{name}'")
@@ -90,6 +98,7 @@ def cmd_encode(args) -> None:
 
 
 def clause_preview(clauses) -> str:
+    """The first clause of a group, shortened so the table stays on one line."""
     if not clauses:
         return "-"
     text = clause_str(clauses[0])
@@ -97,6 +106,7 @@ def clause_preview(clauses) -> str:
 
 
 def cmd_explain(args) -> None:
+    """Print the deduction proof, then the solved grid or the leftover candidates."""
     name, grid = load_puzzle(args.puzzle)
     heading(f"Step-by-step logical solution of '{name}'")
     print(grid.pretty())
@@ -107,6 +117,7 @@ def cmd_explain(args) -> None:
         return
     print()
     for i, step in enumerate(result.steps, 1):
+        # --limit 0 is falsy, so 0 means "print every step".
         if args.limit and i > args.limit:
             print(f"... {len(result.steps) - args.limit} more steps (use --limit 0 to show all)")
             break
@@ -125,6 +136,7 @@ def cmd_explain(args) -> None:
 
 
 def cmd_solve(args) -> None:
+    """Solve with one method, then model-check the answer and test uniqueness."""
     name, grid = load_puzzle(args.puzzle)
     heading(f"Solving '{name}' with method: {args.method}")
     if args.method == "logic":
@@ -145,6 +157,7 @@ def cmd_solve(args) -> None:
         return
     print()
     print(side_by_side(grid, solution))
+    # Rebuild the CNF and check that the finished grid makes every clause true.
     violated = evaluate(encode(grid), grid_to_assignment(solution))
     print(f"\nModel check: {len(encode(grid)):,} clauses, {len(violated)} violated.")
     uniqueness = count_solutions(grid).solutions_found
@@ -153,6 +166,7 @@ def cmd_solve(args) -> None:
 
 
 def cmd_compare(args) -> None:
+    """Run every method. The puzzle argument "all" means the whole library."""
     names = list(PUZZLES) if args.puzzle == "all" else [args.puzzle]
     for spec in names:
         name, grid = load_puzzle(spec)
@@ -165,6 +179,7 @@ def cmd_compare(args) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
+    # The logic symbols (∀, ¬, ∨) need UTF-8. Windows consoles default to cp1252.
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 

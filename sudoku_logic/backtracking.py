@@ -18,25 +18,29 @@ from dataclasses import dataclass
 
 from .board import CELLS, Grid, box_of
 
+# Bits 1 through 9 are 1 and bit 0 is unused, so a digit d is the bit 1 << d.
+# Example: digit 3 is the number 0b1000. Combining digits is then a bitwise OR.
 ALL = 0b1111111110  # bits 1..9 set
 
 
 @dataclass
 class SearchResult:
-    solution: Grid | None
-    solutions_found: int
-    nodes: int
-    backtracks: int
+    solution: Grid | None       # the first solution found, or None
+    solutions_found: int        # how many were found before the limit
+    nodes: int                  # recursive calls, one per partial grid
+    backtracks: int             # cells where every digit failed
     seconds: float
-    gave_up: bool = False
+    gave_up: bool = False       # True when the node limit stopped the search
 
 
 class _Search:
     def __init__(self, grid: Grid, mrv: bool, limit: int, node_limit: int | None):
-        self.mrv = mrv
-        self.limit = limit
-        self.node_limit = node_limit
+        self.mrv = mrv                  # pick the most constrained cell when True
+        self.limit = limit              # stop after this many solutions
+        self.node_limit = node_limit    # stop after this many nodes, or None
+        # values[i] is the digit in CELLS[i]. Index i lines up with CELLS.
         self.values = [grid[cell] for cell in CELLS]
+        # Bit masks of digits already used. Index 0 is unused so row 1 is rows[1].
         self.rows = [0] * 10
         self.cols = [0] * 10
         self.boxes = [0] * 10
@@ -49,28 +53,35 @@ class _Search:
             if d:
                 bit = 1 << d
                 b = box_of((r, c))
+                # AND with the bit is nonzero when that digit is already used.
                 if (self.rows[r] | self.cols[c] | self.boxes[b]) & bit:
                     raise ValueError("the given clues break a Sudoku rule")
+                # OR writes the bit into each of the three units.
                 self.rows[r] |= bit
                 self.cols[c] |= bit
                 self.boxes[b] |= bit
 
     def options(self, i: int) -> int:
+        """Bits of the digits still legal in cell i."""
         r, c = CELLS[i]
+        # Used digits are the OR of the three units. NOT flips them, and AND
+        # with ALL keeps only bits 1..9.
         return ALL & ~(self.rows[r] | self.cols[c] | self.boxes[box_of((r, c))])
 
     def choose_cell(self) -> int | None:
+        """Index of the next empty cell, or None when the grid is full."""
         best, best_count = None, 10
         for i, d in enumerate(self.values):
             if d:
                 continue
             if not self.mrv:
-                return i
+                return i  # first empty cell in reading order
+            # bin(...).count("1") is the number of legal digits.
             count = bin(self.options(i)).count("1")
             if count < best_count:
                 best, best_count = i, count
                 if count <= 1:
-                    break
+                    break  # zero or one option cannot be beaten
         return best
 
     def run(self) -> None:
@@ -82,6 +93,7 @@ class _Search:
             return
         i = self.choose_cell()
         if i is None:
+            # Base case of the induction: no empty cells, so this is a solution.
             self.found.append(list(self.values))
             return
         r, c = CELLS[i]
@@ -90,18 +102,21 @@ class _Search:
         for d in range(1, 10):
             bit = 1 << d
             if not opts & bit:
-                continue
+                continue  # this digit breaks a row, column, or box
+            # Make the choice, then recurse on a grid with one fewer empty cell.
             self.values[i] = d
             self.rows[r] |= bit
             self.cols[c] |= bit
             self.boxes[b] |= bit
             self.run()
+            # Undo the choice so the next digit is tried on the same grid.
             self.rows[r] &= ~bit
             self.cols[c] &= ~bit
             self.boxes[b] &= ~bit
             self.values[i] = 0
             if len(self.found) >= self.limit or self.gave_up:
                 return
+        # Every legal digit led to a dead end, so this partial grid fails.
         self.backtracks += 1
 
 

@@ -1,4 +1,9 @@
+# Bytecode Python writes next to the source files.
 __pycache__/
 *.pyc
+
+# A local virtual environment, if one is created later.
 .venv/
+
+# CNF files produced by "python main.py encode --dimacs".
 *.cnf

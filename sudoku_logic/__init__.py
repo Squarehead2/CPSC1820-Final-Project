@@ -1,4 +1,8 @@
-"""Sudoku solved with discrete mathematics: sets, logic, and proofs."""
+"""Sudoku solved with discrete mathematics: sets, logic, and proofs.
+
+Importing sudoku_logic exposes the pieces a script usually needs:
+the Grid type, the CNF encoding, and the three solvers.
+"""
 
 from .backtracking import count_solutions, solve_backtracking
 from .board import Grid

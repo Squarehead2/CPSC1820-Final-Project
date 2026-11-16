@@ -1,5 +1,11 @@
-"""Sample puzzles, from easy to very hard. '.' marks an empty cell."""
+"""Sample puzzles, from easy to very hard. '.' marks an empty cell.
 
+Each value is (short description, 81 characters). The 81 characters are
+the grid in row-major order, nine rows of nine with no separators.
+The descriptions say which inference rule the puzzle is meant to show.
+"""
+
+# name -> (why this puzzle is in the library, the grid as 81 characters)
 PUZZLES: dict[str, tuple[str, str]] = {
     "easy": (
         "Wikipedia's example puzzle. Singles alone solve it.",
